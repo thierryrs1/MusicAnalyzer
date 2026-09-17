@@ -8,23 +8,24 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [speed, setSpeed] = useState(1.0);
   const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(false);
+  const [filename, setFilename] = useState<string | null>(null);
+  const [stems, setStems] = useState<Record<string, string> | null>(null);
+  const [isSeparating, setIsSeparating] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-
-  useEffect(() => {
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setAudioUrl(url);
-      setBpm(null);
-      setBeats([]);
-      return () => URL.revokeObjectURL(url);
-    }
-  }, [file]);
+  const stemRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+      const newFile = e.target.files[0];
+      setFile(newFile);
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      setAudioUrl(URL.createObjectURL(newFile));
+      setBpm(null);
+      setBeats([]);
+      setFilename(null);
+      setStems(null);
     }
   };
 
@@ -44,11 +45,35 @@ function App() {
       const data = await res.json();
       setBpm(Math.round(data.bpm));
       setBeats(data.beats);
+      setFilename(data.filename);
     } catch (err) {
       console.error(err);
       alert("Erro ao analisar o áudio. Verifique se o backend está rodando em http://localhost:8000.");
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleSeparate = async () => {
+    if (!filename) return;
+    setIsSeparating(true);
+    try {
+      const res = await fetch(`http://localhost:8000/separate/${filename}`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Erro na separação");
+      const data = await res.json();
+      
+      const fullStems: Record<string, string> = {};
+      for (const [key, path] of Object.entries(data.stems as Record<string, string>)) {
+          fullStems[key] = `http://localhost:8000${path}`;
+      }
+      setStems(fullStems);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao separar stems. Pode levar alguns minutos caso o modelo esteja baixando.");
+    } finally {
+      setIsSeparating(false);
     }
   };
 
@@ -64,6 +89,28 @@ function App() {
   const lastBeatIndexRef = useRef(-1);
   const rafRef = useRef<number>(0);
 
+  const playClick = (isFirstBeat: boolean) => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.frequency.value = isFirstBeat ? 1500 : 1000;
+    osc.type = 'sine';
+    
+    gain.gain.setValueAtTime(0.5, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+    
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.05);
+  };
+
   useEffect(() => {
     if (!isMetronomeEnabled || beats.length === 0) {
         lastBeatIndexRef.current = -1;
@@ -77,7 +124,6 @@ function App() {
     const checkBeats = () => {
       if (audioRef.current && !audioRef.current.paused) {
         const currentTime = audioRef.current.currentTime;
-        // Look for the current beat (within a 100ms window)
         const beatIndex = beats.findIndex(b => b >= currentTime && b < currentTime + 0.1);
         
         if (beatIndex !== -1 && beatIndex !== lastBeatIndexRef.current) {
@@ -94,29 +140,6 @@ function App() {
       cancelAnimationFrame(rafRef.current);
     };
   }, [isMetronomeEnabled, beats]);
-
-  const playClick = (isFirstBeat: boolean) => {
-    if (!audioCtxRef.current) return;
-    const ctx = audioCtxRef.current;
-    
-    if (ctx.state === 'suspended') ctx.resume();
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    
-    // Higher frequency for first beat of a measure (assuming 4/4)
-    osc.frequency.value = isFirstBeat ? 1500 : 1000;
-    osc.type = 'sine';
-    
-    gain.gain.setValueAtTime(0.5, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-    
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.05);
-  };
 
   return (
     <div className="app-container">
@@ -182,6 +205,44 @@ function App() {
                 {isMetronomeEnabled ? "🔊 Metrônomo ON" : "🔈 Metrônomo OFF"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {filename && !stems && (
+        <div className="fiori-card">
+          <h2>4. Separação de Instrumentos (Demucs)</h2>
+          <button 
+            className="btn" 
+            onClick={handleSeparate} 
+            disabled={isSeparating}
+          >
+            {isSeparating ? "Separando (Isso pode levar alguns minutos)..." : "Extrair Vocais, Bateria, Baixo e Outros"}
+          </button>
+        </div>
+      )}
+
+      {stems && (
+        <div className="fiori-card">
+          <h2>4. Stem Mixer</h2>
+          <div className="stem-mixer">
+            {Object.entries(stems).map(([name, url]) => (
+              <div key={name} className="stem-track">
+                <span className="stem-label">{name.toUpperCase()}</span>
+                <audio 
+                  src={url} 
+                  controls 
+                  className="stem-audio" 
+                  ref={el => stemRefs.current[name] = el}
+                />
+                <a href={url} download={`${name}.wav`} className="btn stem-download-btn">Baixar</a>
+              </div>
+            ))}
+          </div>
+          <div className="control-row" style={{marginTop: '1rem'}}>
+            <button className="btn" onClick={() => Object.values(stemRefs.current).forEach(a => a?.play())}>▶ Play Todos</button>
+            <button className="btn" onClick={() => Object.values(stemRefs.current).forEach(a => a?.pause())}>⏸ Pause Todos</button>
+            <button className="btn" onClick={() => Object.values(stemRefs.current).forEach(a => { if(a) a.currentTime = 0; })}>⏮ Reset</button>
           </div>
         </div>
       )}
