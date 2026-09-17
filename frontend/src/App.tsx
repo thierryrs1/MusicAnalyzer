@@ -41,14 +41,20 @@ function App() {
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error("Erro na análise");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        const errorMessage = errorData?.detail || "Erro na análise";
+        throw new Error(errorMessage);
+      }
+      
       const data = await res.json();
       setBpm(Math.round(data.bpm));
       setBeats(data.beats);
       setFilename(data.filename);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      alert("Erro ao analisar o áudio. Verifique se o backend está rodando em http://localhost:8000.");
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      alert(msg);
     } finally {
       setIsAnalyzing(false);
     }
