@@ -1,0 +1,249 @@
+{
+    "project": {
+        "name": "Music Analyzer",
+        "description": "Software para análise e estudo musical a partir de um arquivo de áudio e sua letra.",
+        "goal": "Receber uma música em MP3/WAV e opcionalmente sua letra, processar o áudio localmente e gerar informações e arquivos úteis para estudo musical."
+    },
+    "input": {
+        "audio": {
+            "formats": [
+                "mp3",
+                "wav",
+                "flac",
+                "m4a"
+            ],
+            "required": true
+        },
+        "lyrics": {
+            "formats": [
+                "txt",
+                "lrc"
+            ],
+            "required": false
+        }
+    },
+    "features": {
+        "audio_analysis": {
+            "detect_bpm": true,
+            "detect_beats": true,
+            "detect_tempo_changes": true,
+            "detect_key": true,
+            "detect_time_signature": true
+        },
+        "metronome": {
+            "generate_synced_metronome": true,
+            "follow_detected_beats": true,
+            "support_tempo_map": true,
+            "allow_manual_bpm_adjustment": true,
+            "allow_volume_control": true,
+            "allow_metronome_enable_disable": true
+        },
+        "stem_separation": {
+            "enabled": true,
+            "preferred_model": "Demucs",
+            "stems": [
+                "vocals",
+                "drums",
+                "bass",
+                "other"
+            ],
+            "allow_individual_mute": true,
+            "allow_individual_volume": true,
+            "export_stems": true
+        },
+        "lyrics_sync": {
+            "enabled": true,
+            "use_user_provided_lyrics": true,
+            "speech_recognition_for_alignment": true,
+            "word_level_timestamps": true,
+            "line_level_timestamps": true,
+            "allow_manual_correction": true,
+            "export_lrc": true
+        },
+        "vocal_midi": {
+            "enabled": true,
+            "source": "separated_vocal_stem",
+            "pitch_detection": true,
+            "note_detection": true,
+            "note_start_detection": true,
+            "note_duration_detection": true,
+            "midi_export": true,
+            "allow_pitch_correction": true,
+            "allow_note_editing": true
+        },
+        "playback": {
+            "play_pause": true,
+            "seek": true,
+            "volume": true,
+            "loop": true,
+            "loop_start": true,
+            "loop_end": true,
+            "speed_control": true,
+            "pitch_preservation_when_changing_speed": true
+        },
+        "study_mode": {
+            "slow_down_song": true,
+            "preserve_pitch": true,
+            "loop_sections": true,
+            "mute_vocal": true,
+            "mute_instrumental": true,
+            "metronome_overlay": true
+        },
+        "export": {
+            "audio_stems": true,
+            "metronome_audio": true,
+            "synchronized_lyrics_lrc": true,
+            "vocal_midi": true,
+            "tempo_map": true,
+            "analysis_json": true
+        }
+    },
+    "suggested_architecture": {
+        "backend": {
+            "language": "Python",
+            "reason": "Strong ecosystem for audio processing, machine learning, source separation, speech recognition, pitch detection and MIDI."
+        },
+        "frontend": {
+            "preferred": "Web application",
+            "suggestions": [
+                "React",
+                "Vite",
+                "TypeScript"
+            ]
+        },
+        "processing": {
+            "prefer_local_processing": true,
+            "cloud_api_required": false,
+            "gpu_acceleration_when_available": true,
+            "cpu_fallback_required": true
+        }
+    },
+    "suggested_technologies": {
+        "source_separation": [
+            "Demucs",
+            "MDX-compatible models"
+        ],
+        "speech_recognition": [
+            "Whisper",
+            "faster-whisper"
+        ],
+        "audio_analysis": [
+            "librosa",
+            "Essentia"
+        ],
+        "pitch_detection": [
+            "CREPE",
+            "torchcrepe",
+            "pYIN"
+        ],
+        "midi": [
+            "pretty_midi",
+            "mido"
+        ],
+        "audio_processing": [
+            "FFmpeg",
+            "soundfile",
+            "numpy",
+            "scipy"
+        ]
+    },
+    "workflow": [
+        "User selects audio file.",
+        "User optionally provides lyrics.",
+        "System validates and normalizes the audio.",
+        "System detects BPM, beats, tempo changes, key and time signature.",
+        "System separates the audio into stems.",
+        "System generates a synchronized metronome and tempo map.",
+        "If lyrics were provided, system aligns them to the vocal performance.",
+        "System extracts the vocal stem.",
+        "System detects vocal pitch and converts detected notes into MIDI.",
+        "System presents the results in the interface.",
+        "User can play, loop, slow down, mute stems and adjust the metronome.",
+        "User can export stems, LRC, MIDI, tempo map and analysis data."
+    ],
+    "ui": {
+        "style": "modern dark music-production interface",
+        "main_sections": [
+            "file upload",
+            "audio player",
+            "waveform",
+            "timeline",
+            "stem mixer",
+            "metronome",
+            "synchronized lyrics",
+            "vocal pitch/MIDI visualization",
+            "export controls"
+        ],
+        "important_controls": [
+            "Play/Pause",
+            "BPM",
+            "Speed",
+            "Loop",
+            "Metronome",
+            "Stem volume",
+            "Stem mute",
+            "Lyrics",
+            "Export MIDI",
+            "Export Stems"
+        ]
+    },
+    "development_requirements": {
+        "first_priority": "Create a working MVP rather than a theoretical architecture.",
+        "code_quality": [
+            "modular",
+            "maintainable",
+            "typed where practical",
+            "clear project structure",
+            "configuration separated from business logic"
+        ],
+        "important": [
+            "Do not implement fake processing or placeholder AI results.",
+            "Use real open-source models and libraries where possible.",
+            "Prefer local processing.",
+            "The application must remain usable when GPU acceleration is unavailable.",
+            "Long-running processing must not freeze the UI.",
+            "Show processing progress to the user.",
+            "Handle errors gracefully.",
+            "Keep intermediate files organized and cleanable."
+        ]
+    },
+    "mvp_scope": {
+        "phase_1": [
+            "Audio upload",
+            "BPM detection",
+            "Beat detection",
+            "Audio playback",
+            "Speed control with pitch preservation",
+            "Loop",
+            "Synchronized metronome"
+        ],
+        "phase_2": [
+            "Stem separation",
+            "Stem mixer",
+            "Stem export"
+        ],
+        "phase_3": [
+            "Lyrics alignment",
+            "Word-level timestamps",
+            "LRC export"
+        ],
+        "phase_4": [
+            "Vocal pitch detection",
+            "Vocal MIDI generation",
+            "MIDI visualization",
+            "MIDI editing"
+        ]
+    },
+    "engineering_instructions": [
+        "Before coding, inspect the existing project files and determine what already exists.",
+        "Do not unnecessarily rewrite existing working code.",
+        "Explain important architectural decisions briefly.",
+        "Implement the project incrementally.",
+        "After each major implementation, verify that it actually works.",
+        "Prefer a functional MVP over implementing every feature at once.",
+        "When a requested feature has technical limitations, explain the limitation and implement the most reliable practical solution.",
+        "Provide exact commands for installation, development and execution.",
+        "Document required models and their licenses."
+    ],
+    "final_objective": "Build a practical local music-study application that transforms an audio file and lyrics into synchronized playback, stems, metronome, synchronized lyrics and a MIDI representation of the vocal melody."
+}
