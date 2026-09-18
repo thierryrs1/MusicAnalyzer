@@ -428,40 +428,6 @@ function App() {
                     </div>
                   )}
 
-                  {/* CIFRA MELÓDICA */}
-                  {vocalNotes.length > 0 && (
-                    <div className="melodic-cipher-panel">
-                      <h3>Cifra Melódica (Texto)</h3>
-                      <div className="cipher-content">
-                        {(() => {
-                          const phrases = [];
-                          let currentPhrase = [];
-                          
-                          vocalNotes.forEach((note, i) => {
-                            if (i > 0 && note.start - vocalNotes[i-1].end > 1.5) {
-                              phrases.push(currentPhrase);
-                              currentPhrase = [];
-                            }
-                            const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-                            const name = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
-                            currentPhrase.push({ name, active: currentTime >= note.start && currentTime <= note.end });
-                          });
-                          if (currentPhrase.length > 0) phrases.push(currentPhrase);
-                          
-                          return phrases.map((phrase, i) => (
-                            <div key={i} className="cipher-phrase">
-                              {phrase.map((n, j) => (
-                                <span key={j} className={`cipher-note ${n.active ? 'active' : ''}`}>
-                                  {n.name}
-                                </span>
-                              ))}
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  )}
-
                   <div className="tracks-container">
                 {Object.entries(stems).map(([name, url], index) => {
                   const isFirst = index === 0;
