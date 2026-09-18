@@ -383,9 +383,16 @@ function App() {
                           min="0" max="1" step="0.01" 
                           value={trackStates[name]?.volume ?? 1} 
                           onChange={(e) => updateTrack(name, { volume: parseFloat(e.target.value) })}
+                        />
                       </div>
                       
-                      <div className="track-waveform-container">
+                      <div 
+                        className="track-waveform-container"
+                        style={{
+                          maskImage: `url("http://localhost:8000/waveform/${encodeURIComponent(filename!)}/${name}")`,
+                          WebkitMaskImage: `url("http://localhost:8000/waveform/${encodeURIComponent(filename!)}/${name}")`
+                        }}
+                      >
                         <div 
                           className={`track-waveform-fill color-${name}`} 
                           style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
