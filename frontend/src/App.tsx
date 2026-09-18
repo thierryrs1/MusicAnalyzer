@@ -374,56 +374,86 @@ function App() {
                   {/* PIANO ROLL (Modo Estudo) */}
                   {vocalNotes.length > 0 && (
                     <div className="piano-roll-panel">
-                      <h3>Estudo de Melodia (Vocais)</h3>
-                      <div className="piano-roll-container">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{ margin: 0 }}>Estudo de Melodia (Vocais)</h3>
+                        <div className="current-note-display">
+                           {(() => {
+                              const currentNote = vocalNotes.find(n => currentTime >= n.start && currentTime <= n.end);
+                              if (currentNote) {
+                                const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                                return <span>Nota atual: <strong>{noteNames[currentNote.pitch % 12] + Math.floor(currentNote.pitch / 12 - 1)}</strong></span>
+                              }
+                              return <span style={{opacity: 0.5}}>Aguardando voz...</span>
+                           })()}
+                        </div>
+                      </div>
+                      <div className="piano-roll-container" style={{ display: 'flex' }}>
                         
-                        {/* Grid background */}
-                        <div className="piano-grid">
-                          {[...Array(48)].map((_, i) => (
-                            <div key={i} className="piano-grid-line" style={{ top: `${(i / 48) * 100}%` }}></div>
-                          ))}
+                        {/* Keyboard Y-axis */}
+                        <div className="piano-keys-y">
+                           {[...Array(48)].map((_, i) => {
+                             const pitch = 84 - i;
+                             const isC = pitch % 12 === 0;
+                             return (
+                               <div key={i} className={`piano-key ${isC ? 'c-note' : ''}`}>
+                                 {isC ? `C${Math.floor(pitch / 12 - 1)}` : ''}
+                               </div>
+                             );
+                           })}
                         </div>
                         
-                        <div className="piano-playhead" style={{ left: '20%' }}></div>
-                        
-                        {(() => {
-                          const windowSize = 10;
-                          const playheadOffset = 2;
+                        <div className="piano-roll-viewport" style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                          {/* Grid background */}
+                          <div className="piano-grid">
+                            {[...Array(48)].map((_, i) => (
+                              <div key={i} className={`piano-grid-line ${i % 12 === 0 ? 'octave' : ''}`} style={{ top: `${(i / 48) * 100}%` }}></div>
+                            ))}
+                          </div>
                           
-                          const visibleNotes = vocalNotes.filter(n => 
-                            (n.start - currentTime + playheadOffset) < windowSize &&
-                            (n.end - currentTime + playheadOffset) > 0
-                          );
+                          <div className="piano-playhead" style={{ left: '20%' }}></div>
                           
-                          const minP = 36;
-                          const maxP = 84;
-                          const pRange = maxP - minP;
-                          
-                          return visibleNotes.map((note, i) => {
-                            const left = ((note.start - currentTime + playheadOffset) / windowSize) * 100;
-                            const width = ((note.end - note.start) / windowSize) * 100;
+                          {(() => {
+                            const windowSize = 10;
+                            const playheadOffset = 2;
                             
-                            const clampedPitch = Math.max(minP, Math.min(maxP, note.pitch));
-                            const top = (1 - (clampedPitch - minP) / pRange) * 100;
-                            
-                            const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-                            const noteName = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
-
-                            return (
-                              <div 
-                                key={i} 
-                                className="midi-note" 
-                                title={`Nota: ${noteName}`}
-                                style={{ 
-                                  left: `${left}%`, 
-                                  width: `${Math.max(0.5, width)}%`, 
-                                  top: `${top}%`,
-                                  height: `${100 / pRange}%`
-                                }}
-                              />
+                            const visibleNotes = vocalNotes.filter(n => 
+                              (n.start - currentTime + playheadOffset) < windowSize &&
+                              (n.end - currentTime + playheadOffset) > 0
                             );
-                          });
-                        })()}
+                            
+                            const minP = 36;
+                            const maxP = 84;
+                            const pRange = maxP - minP;
+                            
+                            return visibleNotes.map((note, i) => {
+                              const left = ((note.start - currentTime + playheadOffset) / windowSize) * 100;
+                              const width = ((note.end - note.start) / windowSize) * 100;
+                              
+                              const clampedPitch = Math.max(minP, Math.min(maxP, note.pitch));
+                              const top = (1 - (clampedPitch - minP) / pRange) * 100;
+                              
+                              const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                              const noteName = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
+                              const isCurrent = currentTime >= note.start && currentTime <= note.end;
+
+                              return (
+                                <div 
+                                  key={i} 
+                                  className={`midi-note ${isCurrent ? 'active-note' : ''}`}
+                                  title={`Nota: ${noteName}`}
+                                  style={{ 
+                                    left: `${left}%`, 
+                                    width: `${Math.max(0.5, width)}%`, 
+                                    top: `calc(${top}% - 10px)`,
+                                    height: `20px`
+                                  }}
+                                >
+                                  <span className="note-label">{noteName}</span>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
                       </div>
                     </div>
                   )}

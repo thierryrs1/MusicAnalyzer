@@ -465,24 +465,57 @@ body, html {
 }
 
 .piano-roll-container {
-  position: relative;
   height: 250px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.3);
   border-radius: 8px;
-  overflow: hidden;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.piano-keys-y {
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.6);
+  z-index: 5;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.piano-key {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 4px;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.4);
+  border-bottom: 1px solid rgba(255,255,255,0.02);
+}
+.piano-key.c-note {
+  background: rgba(255,255,255,0.05);
+  color: var(--moises-accent);
+  font-weight: bold;
+}
+
+.piano-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .piano-grid-line {
   position: absolute;
-  left: 0;
-  right: 0;
+  width: 100%;
   height: 1px;
   background: rgba(255, 255, 255, 0.03);
 }
-
-.piano-grid-line:nth-child(12n) {
-  background: rgba(255, 255, 255, 0.15);
+.piano-grid-line.octave {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .piano-playhead {
@@ -491,18 +524,49 @@ body, html {
   bottom: 0;
   width: 2px;
   background: var(--moises-accent);
-  box-shadow: 0 0 10px var(--moises-accent);
   z-index: 10;
+  box-shadow: 0 0 10px var(--moises-accent);
+}
+
+.current-note-display {
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid var(--moises-accent);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+}
+.current-note-display strong {
+  color: var(--moises-accent);
+  font-size: 1.1rem;
 }
 
 .midi-note {
   position: absolute;
   background: linear-gradient(90deg, #00E5FF, #32ADE6);
-  border-radius: 3px;
-  opacity: 0.9;
+  border-radius: 6px;
+  opacity: 0.8;
   transition: opacity 0.2s, transform 0.1s;
   cursor: crosshair;
-  box-shadow: 0 2px 5px rgba(0, 229, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 229, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  z-index: 20;
+}
+.midi-note.active-note {
+  opacity: 1;
+  background: linear-gradient(90deg, #fff, #00E5FF);
+  box-shadow: 0 0 15px #00E5FF, 0 0 5px #fff;
+  transform: scaleY(1.3);
+  z-index: 30;
+}
+.midi-note .note-label {
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: #000;
+  white-space: nowrap;
 }
 
 .midi-note:hover {
