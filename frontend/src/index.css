@@ -464,6 +464,41 @@ body, html {
   font-weight: 600;
 }
 
+/* VIEW TABS */
+.view-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+.tab-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.tab-btn.active {
+  background: var(--moises-accent);
+  border-color: var(--moises-accent);
+  color: #000;
+  font-weight: bold;
+}
+
+.tracks-container.hidden {
+  display: none !important;
+}
+
+.piano-roll-panel.fullscreen-karaoke .piano-roll-container {
+  height: 65vh;
+}
+
 .piano-roll-container {
   height: 250px;
   background: rgba(0, 0, 0, 0.3);

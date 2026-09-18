@@ -30,6 +30,9 @@ function App() {
   // Karaoke hook
   const { pitch: userPitch, isRecording: isMicActive, startRecording: startMic, stopRecording: stopMic } = usePitchDetection();
 
+  // View Mode
+  const [viewMode, setViewMode] = useState<'mixer' | 'karaoke'>('mixer');
+
   // Mixer States
   const [trackStates, setTrackStates] = useState<Record<string, { volume: number; muted: boolean; solo: boolean }>>({});
   const [isPlaying, setIsPlaying] = useState(false);
@@ -375,11 +378,16 @@ function App() {
               </div>
             ) : (
               <>
+                <div className="view-tabs">
+                  <button className={`tab-btn ${viewMode === 'mixer' ? 'active' : ''}`} onClick={() => setViewMode('mixer')}>Mixer Multi-faixa</button>
+                  <button className={`tab-btn ${viewMode === 'karaoke' ? 'active' : ''}`} onClick={() => setViewMode('karaoke')}>Modo Karaokê (Estudo de Vocais)</button>
+                </div>
+                
                 <div className="tracks-wrapper">
                   
                   {/* PIANO ROLL (Modo Estudo) */}
-                  {vocalNotes.length > 0 && (
-                    <div className="piano-roll-panel">
+                  {vocalNotes.length > 0 && viewMode === 'karaoke' && (
+                    <div className="piano-roll-panel fullscreen-karaoke">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <h3 style={{ margin: 0 }}>Estudo de Melodia (Vocais)</h3>
@@ -547,7 +555,7 @@ function App() {
                     </div>
                   )}
 
-                  <div className="tracks-container">
+                  <div className={`tracks-container ${viewMode === 'karaoke' ? 'hidden' : ''}`}>
                 {Object.entries(stems).map(([name, url], index) => {
                   const isFirst = index === 0;
                   return (
