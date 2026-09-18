@@ -236,6 +236,89 @@ def get_waveform(filename: str, stem: str):
         
     return Response(content=svg_content, media_type="image/svg+xml")
 
+@app.post("/midi/{filename}/{stem}")
+def generate_midi(filename: str, stem: str):
+    safe_filename = os.path.splitext(filename)[0]
+    wav_path = os.path.join(SEPARATED_DIR, "htdemucs_6s", safe_filename, f"{stem}.wav")
+    midi_path = os.path.join(SEPARATED_DIR, "htdemucs_6s", safe_filename, f"{stem}.mid")
+    
+    if not os.path.exists(wav_path):
+        raise HTTPException(status_code=404, detail="WAV file not found")
+        
+    try:
+        import librosa
+        import numpy as np
+        import pretty_midi
+        import scipy.signal
+        
+        y, sr = librosa.load(wav_path, sr=22050)
+        f0 = librosa.yin(y, fmin=65.4, fmax=1046.5, sr=sr, frame_length=2048)
+        
+        rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
+        if np.max(rms) > 0:
+            rms = rms / np.max(rms)
+            
+        f0 = np.where(f0 > 0, f0, 1.0)
+        midi_pitches = librosa.hz_to_midi(f0)
+        midi_pitches = np.round(midi_pitches).astype(int)
+        
+        min_len = min(len(midi_pitches), len(rms))
+        midi_pitches = midi_pitches[:min_len]
+        rms = rms[:min_len]
+        
+        midi_pitches[rms < 0.05] = 0
+        midi_pitches = scipy.signal.medfilt(midi_pitches, kernel_size=5)
+        
+        notes = []
+        current_pitch = 0
+        start_frame = 0
+        
+        for i, pitch in enumerate(midi_pitches):
+            if pitch != current_pitch:
+                if current_pitch > 0:
+                    start_time = librosa.frames_to_time(start_frame, sr=sr, hop_length=512)
+                    end_time = librosa.frames_to_time(i, sr=sr, hop_length=512)
+                    if end_time - start_time >= 0.1:
+                        notes.append({
+                            "pitch": int(current_pitch),
+                            "start": start_time,
+                            "end": end_time,
+                            "velocity": 100
+                        })
+                current_pitch = pitch
+                start_frame = i
+                
+        if current_pitch > 0:
+            start_time = librosa.frames_to_time(start_frame, sr=sr, hop_length=512)
+            end_time = librosa.frames_to_time(len(midi_pitches), sr=sr, hop_length=512)
+            if end_time - start_time >= 0.1:
+                notes.append({
+                    "pitch": int(current_pitch),
+                    "start": start_time,
+                    "end": end_time,
+                    "velocity": 100
+                })
+                
+        pm = pretty_midi.PrettyMIDI()
+        inst = pretty_midi.Instrument(program=52) # Choir Aahs
+        for n in notes:
+            note = pretty_midi.Note(
+                velocity=n['velocity'],
+                pitch=n['pitch'],
+                start=n['start'],
+                end=n['end']
+            )
+            inst.notes.append(note)
+        pm.instruments.append(inst)
+        pm.write(midi_path)
+        
+        return {"message": "MIDI generated successfully", "notes": notes, "midi_url": f"/stems/htdemucs_6s/{safe_filename}/{stem}.mid"}
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

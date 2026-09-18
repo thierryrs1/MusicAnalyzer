@@ -31,8 +31,10 @@ function App() {
   const [duration, setDuration] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [midiProcessing, setMidiProcessing] = useState<string | null>(null);
+  const stemRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const stemRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
   const runAnalysis = async (fileToAnalyze: File) => {
     setIsAnalyzing(true);
@@ -126,11 +128,33 @@ function App() {
       if (!res.ok) throw new Error("Erro na extração de letras");
       const data = await res.json();
       setLyrics(data.lyrics);
-    } catch (err: unknown) {
-      console.error(err);
-      alert("Erro ao extrair letras.");
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao extrair letras.');
     } finally {
       setIsExtractingLyrics(false);
+    }
+  };
+
+  const extractMidi = async (stem: string) => {
+    if (!filename) return;
+    setMidiProcessing(stem);
+    try {
+      const response = await fetch(`http://localhost:8000/midi/${encodeURIComponent(filename)}/${stem}`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+      if (data.midi_url) {
+        const a = document.createElement('a');
+        a.href = `http://localhost:8000${data.midi_url}`;
+        a.download = `${stem}.mid`;
+        a.click();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao gerar MIDI");
+    } finally {
+      setMidiProcessing(null);
     }
   };
 
@@ -363,7 +387,18 @@ function App() {
                       <div className="track-controls">
                         <div className="track-header">
                           <span className="track-name">{name.toUpperCase()}</span>
-                          <a href={url} download={`${name}.wav`} className="download-icon" title="Baixar">↓</a>
+                          <div style={{display: 'flex', gap: '8px'}}>
+                            <button 
+                              onClick={() => extractMidi(name)} 
+                              className="download-icon" 
+                              title="Extrair notas para MIDI"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', opacity: midiProcessing === name ? 0.5 : 1 }}
+                              disabled={midiProcessing === name}
+                            >
+                              🎹
+                            </button>
+                            <a href={url} download={`${name}.wav`} className="download-icon" title="Baixar">↓</a>
+                          </div>
                         </div>
                         <div className="track-buttons">
                           <button 
