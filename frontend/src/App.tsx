@@ -370,6 +370,47 @@ function App() {
             ) : (
               <>
                 <div className="tracks-wrapper">
+                  
+                  {/* PIANO ROLL (Modo Estudo) */}
+                  {vocalNotes.length > 0 && (
+                    <div className="piano-roll-panel">
+                      <h3>Estudo de Melodia (Vocais)</h3>
+                      <div className="piano-roll-container">
+                        <div className="piano-playhead" style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}></div>
+                        {(() => {
+                          const minPitch = Math.min(...vocalNotes.map(n => n.pitch)) - 2;
+                          const maxPitch = Math.max(...vocalNotes.map(n => n.pitch)) + 2;
+                          const pitchRange = Math.max(1, maxPitch - minPitch);
+                          
+                          return vocalNotes.map((note, i) => {
+                            const left = duration > 0 ? (note.start / duration) * 100 : 0;
+                            const width = duration > 0 ? ((note.end - note.start) / duration) * 100 : 0;
+                            const top = (1 - (note.pitch - minPitch) / pitchRange) * 100;
+                          
+                          const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                          const noteName = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
+
+                          return (
+                            <div 
+                              key={i} 
+                              className="midi-note" 
+                              title={`Nota: ${noteName}`}
+                              style={{ 
+                                left: `${left}%`, 
+                                width: `${Math.max(0.1, width)}%`, 
+                                top: `${top}%`,
+                                height: `${100 / pitchRange}%`
+                              }}
+                            >
+                              <span>{noteName}</span>
+                            </div>
+                          );
+                        });
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="tracks-container">
                 {Object.entries(stems).map(([name, url], index) => {
                   const isFirst = index === 0;
@@ -470,46 +511,7 @@ function App() {
                   </div>
                 </div>
                 </div>
-                
-                {/* PIANO ROLL (Modo Estudo) */}
-                {vocalNotes.length > 0 && (
-                  <div className="piano-roll-panel">
-                    <h3>Visualizador de Notas (Vocais)</h3>
-                    <div className="piano-roll-container">
-                      <div className="piano-playhead" style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}></div>
-                      {(() => {
-                        const minPitch = Math.min(...vocalNotes.map(n => n.pitch)) - 2;
-                        const maxPitch = Math.max(...vocalNotes.map(n => n.pitch)) + 2;
-                        const pitchRange = Math.max(1, maxPitch - minPitch);
-                        
-                        return vocalNotes.map((note, i) => {
-                          const left = duration > 0 ? (note.start / duration) * 100 : 0;
-                          const width = duration > 0 ? ((note.end - note.start) / duration) * 100 : 0;
-                          const top = (1 - (note.pitch - minPitch) / pitchRange) * 100;
-                        
-                        const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-                        const noteName = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
 
-                        return (
-                          <div 
-                            key={i} 
-                            className="midi-note" 
-                            title={`Nota: ${noteName}`}
-                            style={{ 
-                              left: `${left}%`, 
-                              width: `${Math.max(0.1, width)}%`, 
-                              top: `${top}%`,
-                              height: `${100 / pitchRange}%`
-                            }}
-                          >
-                            <span>{noteName}</span>
-                          </div>
-                        );
-                      });
-                      })()}
-                    </div>
-                  </div>
-                )}
               </div>
 
                 <div className="lyrics-panel">
