@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 function formatTime(seconds: number) {
+  if (!seconds || isNaN(seconds)) return "0:00";
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
@@ -19,7 +20,7 @@ function App() {
   const [isSeparating, setIsSeparating] = useState(false);
 
   // Mixer States
-  const [trackStates, setTrackStates] = useState<Record<string, { volume: number, muted: boolean, solo: boolean }>>({});
+  const [trackStates, setTrackStates] = useState<Record<string, { volume: number; muted: boolean; solo: boolean }>>({});
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -28,7 +29,33 @@ function App() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const stemRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
+  const runAnalysis = async (fileToAnalyze: File) => {
+    setIsAnalyzing(true);
+    
+    const formData = new FormData();
+    formData.append("file", fileToAnalyze);
 
+    try {
+      const res = await fetch("http://localhost:8000/analyze", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.detail || "Erro na análise");
+      }
+      
+      const data = await res.json();
+      setBpm(Math.round(data.bpm));
+      setBeats(data.beats);
+      setFilename(data.filename);
+    } catch (err: unknown) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -40,37 +67,11 @@ function App() {
       setBeats([]);
       setFilename(null);
       setStems(null);
-    }
-  };
-
-  const handleAnalyze = async () => {
-    if (!file) return;
-    setIsAnalyzing(true);
-    
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await fetch("http://localhost:8000/analyze", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => null);
-        const errorMessage = errorData?.detail || "Erro na análise";
-        throw new Error(errorMessage);
-      }
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
       
-      const data = await res.json();
-      setBpm(Math.round(data.bpm));
-      setBeats(data.beats);
-      setFilename(data.filename);
-    } catch (err: unknown) {
-      console.error(err);
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
-      alert(msg);
-    } finally {
-      setIsAnalyzing(false);
+      runAnalysis(newFile);
     }
   };
 
@@ -78,9 +79,7 @@ function App() {
     if (!filename) return;
     setIsSeparating(true);
     try {
-      const res = await fetch(`http://localhost:8000/separate/${filename}`, {
-        method: "POST",
-      });
+      const res = await fetch(`http://localhost:8000/separate/${filename}`, { method: "POST" });
       if (!res.ok) throw new Error("Erro na separação");
       const data = await res.json();
       
@@ -90,13 +89,17 @@ function App() {
           fullStems[key] = `http://localhost:8000${path}`;
           initialStates[key] = { volume: 1, muted: false, solo: false };
       }
+      
+      // Pause the original audio
+      if (audioRef.current) audioRef.current.pause();
+
       setStems(fullStems);
       setTrackStates(initialStates);
       setIsPlaying(false);
       setCurrentTime(0);
     } catch (err: unknown) {
       console.error(err);
-      alert("Erro ao separar stems. Pode levar alguns minutos caso o modelo esteja baixando.");
+      alert("Erro ao separar stems.");
     } finally {
       setIsSeparating(false);
     }
@@ -105,7 +108,15 @@ function App() {
   const handleSpeedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newSpeed = parseFloat(e.target.value);
     setSpeed(newSpeed);
-    if (audioRef.current) {
+    
+    if (stems) {
+      Object.values(stemRefs.current).forEach(audio => {
+        if (audio) {
+          audio.playbackRate = newSpeed;
+          (audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+        }
+      });
+    } else if (audioRef.current) {
       audioRef.current.playbackRate = newSpeed;
       (audioRef.current as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
     }
@@ -114,28 +125,36 @@ function App() {
   const togglePlay = () => {
     const newIsPlaying = !isPlaying;
     setIsPlaying(newIsPlaying);
-    Object.values(stemRefs.current).forEach(audio => {
-      if (audio) {
-        if (newIsPlaying) audio.play();
-        else audio.pause();
-      }
-    });
+    
+    if (stems) {
+      Object.values(stemRefs.current).forEach(audio => {
+        if (audio) {
+          if (newIsPlaying) audio.play();
+          else audio.pause();
+        }
+      });
+    } else if (audioRef.current) {
+      if (newIsPlaying) audioRef.current.play();
+      else audioRef.current.pause();
+    }
   };
 
-  const handleTimeUpdate = () => {
-    const firstTrack = Object.values(stemRefs.current)[0];
-    if (firstTrack) {
-      setCurrentTime(firstTrack.currentTime);
-      if (!duration && firstTrack.duration) setDuration(firstTrack.duration);
-    }
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+    const el = e.currentTarget;
+    setCurrentTime(el.currentTime);
+    if (!duration && el.duration && !isNaN(el.duration)) setDuration(el.duration);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
     setCurrentTime(time);
-    Object.values(stemRefs.current).forEach(audio => {
-      if (audio) audio.currentTime = time;
-    });
+    if (stems) {
+      Object.values(stemRefs.current).forEach(audio => {
+        if (audio) audio.currentTime = time;
+      });
+    } else if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
   };
 
   const updateTrack = (name: string, updates: Partial<{ volume: number, muted: boolean, solo: boolean }>) => {
@@ -155,13 +174,13 @@ function App() {
     });
   };
 
+  // Metronome Logic
   const lastBeatIndexRef = useRef(-1);
   const rafRef = useRef<number>(0);
 
   const playClick = (isFirstBeat: boolean) => {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
-    
     if (ctx.state === 'suspended') ctx.resume();
 
     const osc = ctx.createOscillator();
@@ -191,10 +210,20 @@ function App() {
     }
 
     const checkBeats = () => {
-      if (audioRef.current && !audioRef.current.paused) {
-        const currentTime = audioRef.current.currentTime;
-        const beatIndex = beats.findIndex(b => b >= currentTime && b < currentTime + 0.1);
-        
+      // Find current time depending on stems vs original
+      let currentAudioTime = 0;
+      let isPaused = true;
+      if (stems && stemRefs.current[Object.keys(stems)[0]]) {
+        const ref = stemRefs.current[Object.keys(stems)[0]]!;
+        currentAudioTime = ref.currentTime;
+        isPaused = ref.paused;
+      } else if (audioRef.current) {
+        currentAudioTime = audioRef.current.currentTime;
+        isPaused = audioRef.current.paused;
+      }
+
+      if (!isPaused) {
+        const beatIndex = beats.findIndex(b => b >= currentAudioTime && b < currentAudioTime + 0.1);
         if (beatIndex !== -1 && beatIndex !== lastBeatIndexRef.current) {
            lastBeatIndexRef.current = beatIndex;
            playClick(beatIndex === 0 || beatIndex % 4 === 0);
@@ -204,101 +233,44 @@ function App() {
     };
 
     rafRef.current = requestAnimationFrame(checkBeats);
-
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [isMetronomeEnabled, beats]);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [isMetronomeEnabled, beats, stems]);
 
   return (
-    <div className="app-container">
-      <header>
-        <h1>Music Analyzer MVP</h1>
+    <div className="dashboard">
+      <header className="dash-header">
+        <div className="logo">Music Analyzer</div>
+        <div className="header-actions">
+          {bpm !== null && (
+            <div className="bpm-badge">BPM: {bpm} • {beats.length} beats</div>
+          )}
+          {file && (
+            <label className="btn">
+              Trocar Música
+              <input type="file" accept="audio/*" onChange={handleFileChange} hidden />
+            </label>
+          )}
+        </div>
       </header>
 
-      <div className="fiori-card">
-        <h2>1. Carregar Áudio</h2>
-        <div className="form-group">
-          <input type="file" accept="audio/*" onChange={handleFileChange} />
+      {!file ? (
+        <div className="empty-state">
+          <h2>Importe uma música para começar</h2>
+          <label className="btn btn-large">
+            Selecionar Arquivo
+            <input type="file" accept="audio/*" onChange={handleFileChange} hidden />
+          </label>
         </div>
-        <button 
-          className="btn" 
-          onClick={handleAnalyze} 
-          disabled={!file || isAnalyzing}
-        >
-          {isAnalyzing ? "Analisando..." : "Analisar BPM e Beats"}
-        </button>
-      </div>
-
-      {bpm !== null && (
-        <div className="fiori-card">
-          <h2>2. Resultados da Análise</h2>
-          <div className="control-row">
-            <div className="stat-box"><span>BPM</span> {bpm}</div>
-            <div className="stat-box"><span>Beats</span> {beats.length}</div>
-          </div>
-        </div>
-      )}
-
-      {audioUrl && (
-        <div className="fiori-card">
-          <h2>3. Estudo e Reprodução</h2>
-          <div className="audio-controls">
-            <audio 
-              ref={audioRef} 
-              src={audioUrl} 
-              controls 
-              className="audio-player-native" 
-              loop
-            />
+      ) : (
+        <div className="workspace">
+          {/* Barra de Transporte Unificada */}
+          <div className="transport-bar">
+            <button className="play-btn" onClick={togglePlay} disabled={isAnalyzing || isSeparating}>
+              {isPlaying ? '⏸' : '▶'}
+            </button>
             
-            <div className="control-row">
-              <label>
-                Velocidade ({speed.toFixed(2)}x)
-                <br/>
-                <input 
-                  type="range" 
-                  min="0.5" 
-                  max="1.5" 
-                  step="0.05" 
-                  value={speed} 
-                  onChange={handleSpeedChange} 
-                />
-              </label>
-
-              <button 
-                className={`btn toggle-btn ${isMetronomeEnabled ? 'active' : ''}`}
-                onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
-                disabled={beats.length === 0}
-              >
-                {isMetronomeEnabled ? "🔊 Metrônomo ON" : "🔈 Metrônomo OFF"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {filename && !stems && (
-        <div className="fiori-card">
-          <h2>4. Separação de Instrumentos (Demucs)</h2>
-          <button 
-            className="btn" 
-            onClick={handleSeparate} 
-            disabled={isSeparating}
-          >
-            {isSeparating ? "Separando (Isso pode levar alguns minutos)..." : "Extrair Vocais, Bateria, Baixo, Guitarra, Piano e Outros"}
-          </button>
-        </div>
-      )}
-
-      {stems && (
-        <div className="fiori-card">
-          <h2>4. Studio Mixer</h2>
-          <div className="mixer-container">
-            <div className="master-controls">
-              <button className="btn" onClick={togglePlay}>
-                {isPlaying ? "⏸ Pause" : "▶ Play"}
-              </button>
+            <div className="seek-container">
+              <span className="time">{formatTime(currentTime)}</span>
               <input 
                 type="range" 
                 className="master-seek" 
@@ -307,61 +279,127 @@ function App() {
                 step="0.1" 
                 value={currentTime} 
                 onChange={handleSeek} 
+                disabled={isAnalyzing || isSeparating}
               />
-              <span className="time-display">{formatTime(currentTime)} / {formatTime(duration)}</span>
+              <span className="time">{formatTime(duration)}</span>
             </div>
+            
+            <div className="extra-controls">
+              <div className="speed-control">
+                <span>{speed}x</span>
+                <input 
+                  type="range" 
+                  min="0.5" 
+                  max="1.5" 
+                  step="0.05" 
+                  value={speed} 
+                  onChange={handleSpeedChange} 
+                  disabled={isAnalyzing || isSeparating}
+                />
+              </div>
+              <button 
+                className={`metronome-btn ${isMetronomeEnabled ? 'active' : ''}`}
+                onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
+                disabled={beats.length === 0}
+              >
+                {isMetronomeEnabled ? '🔊 Metrônomo' : '🔈 Metrônomo'}
+              </button>
+            </div>
+          </div>
 
-            <div className="tracks-container">
-              {Object.entries(stems).map(([name, url], index) => {
-                const isFirst = index === 0;
-                return (
-                  <div key={name} className="track-row">
-                    <audio 
-                      src={url} 
-                      ref={el => stemRefs.current[name] = el}
-                      onTimeUpdate={isFirst ? handleTimeUpdate : undefined}
-                      onLoadedMetadata={isFirst ? handleTimeUpdate : undefined}
-                      onEnded={isFirst ? () => setIsPlaying(false) : undefined}
-                    />
-                    
-                    <div className="track-controls">
-                      <div className="track-header">
-                        <span className="track-name">{name.toUpperCase()}</span>
-                        <a href={url} download={`${name}.wav`} className="stem-download-btn" title="Baixar">↓</a>
-                      </div>
-                      <div className="track-buttons">
-                        <button 
-                          className={`mute-btn ${trackStates[name]?.muted ? 'active' : ''}`}
-                          onClick={() => updateTrack(name, { muted: !trackStates[name].muted })}
-                          title="Mute"
-                        >M</button>
-                        <button 
-                          className={`solo-btn ${trackStates[name]?.solo ? 'active' : ''}`}
-                          onClick={() => updateTrack(name, { solo: !trackStates[name].solo })}
-                          title="Solo"
-                        >S</button>
-                      </div>
-                      <input 
-                        type="range" 
-                        className="volume-slider" 
-                        min="0" max="1" step="0.01" 
-                        value={trackStates[name]?.volume ?? 1} 
-                        onChange={(e) => updateTrack(name, { volume: parseFloat(e.target.value) })}
-                      />
-                    </div>
-                    
-                    <div className="track-visual">
-                      <div className="track-progress-bg">
-                        <div 
-                          className={`track-progress-fill color-${name}`} 
-                          style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                        ></div>
-                      </div>
+          {/* Área do Mixer Principal */}
+          <div className="mixer-area">
+            {!stems ? (
+              <div className="original-track-view">
+                {/* Trilha Original */}
+                <div className="track-row" style={{width: '100%'}}>
+                  <audio 
+                    src={audioUrl || ''} 
+                    ref={audioRef} 
+                    onTimeUpdate={handleTimeUpdate}
+                    onLoadedMetadata={handleTimeUpdate}
+                    onEnded={() => setIsPlaying(false)}
+                  />
+                  <div className="track-controls">
+                    <span className="track-name">FAIXA ORIGINAL</span>
+                  </div>
+                  <div className="track-visual">
+                    <div className="track-progress-bg">
+                      <div 
+                        className="track-progress-fill color-original" 
+                        style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                      ></div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+                
+                {/* Overlay de Extração */}
+                <div className="extract-overlay">
+                  <h3 style={{marginTop: 0, fontWeight: 400}}>Música pronta para mixagem</h3>
+                  <button 
+                    className="btn btn-large" 
+                    onClick={handleSeparate} 
+                    disabled={isSeparating || isAnalyzing || !filename}
+                  >
+                    {isSeparating 
+                      ? "Processando Inteligência Artificial (Aguarde 2-5 minutos)..." 
+                      : (isAnalyzing ? "Analisando..." : "Separar Faixas (Vocais, Bateria, Baixo, Guitarra...)")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="tracks-container">
+                {Object.entries(stems).map(([name, url], index) => {
+                  const isFirst = index === 0;
+                  return (
+                    <div key={name} className="track-row">
+                      <audio 
+                        src={url} 
+                        ref={el => stemRefs.current[name] = el}
+                        onTimeUpdate={isFirst ? handleTimeUpdate : undefined}
+                        onLoadedMetadata={isFirst ? handleTimeUpdate : undefined}
+                        onEnded={isFirst ? () => setIsPlaying(false) : undefined}
+                      />
+                      
+                      <div className="track-controls">
+                        <div className="track-header">
+                          <span className="track-name">{name.toUpperCase()}</span>
+                          <a href={url} download={`${name}.wav`} className="download-icon" title="Baixar">↓</a>
+                        </div>
+                        <div className="track-buttons">
+                          <button 
+                            className={`mute-btn ${trackStates[name]?.muted ? 'active' : ''}`}
+                            onClick={() => updateTrack(name, { muted: !trackStates[name].muted })}
+                            title="Mute"
+                          >M</button>
+                          <button 
+                            className={`solo-btn ${trackStates[name]?.solo ? 'active' : ''}`}
+                            onClick={() => updateTrack(name, { solo: !trackStates[name].solo })}
+                            title="Solo"
+                          >S</button>
+                        </div>
+                        <input 
+                          type="range" 
+                          className="volume-slider" 
+                          min="0" max="1" step="0.01" 
+                          value={trackStates[name]?.volume ?? 1} 
+                          onChange={(e) => updateTrack(name, { volume: parseFloat(e.target.value) })}
+                        />
+                      </div>
+                      
+                      <div className="track-visual">
+                        <div className="track-progress-bg">
+                          <div 
+                            className={`track-progress-fill color-${name}`} 
+                            style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
