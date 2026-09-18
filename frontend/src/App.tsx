@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import './index.css';
+import WaveSurfer from 'wavesurfer.js';
+import { usePitchDetection } from './hooks/usePitchDetection';
 
 function formatTime(seconds: number) {
   if (!seconds || isNaN(seconds)) return "0:00";
@@ -23,6 +26,9 @@ function App() {
   const [isExtractingLyrics, setIsExtractingLyrics] = useState(false);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const activeLyricRef = useRef<HTMLDivElement>(null);
+
+  // Karaoke hook
+  const { pitch: userPitch, isRecording: isMicActive, startRecording: startMic, stopRecording: stopMic } = usePitchDetection();
 
   // Mixer States
   const [trackStates, setTrackStates] = useState<Record<string, { volume: number; muted: boolean; solo: boolean }>>({});
@@ -375,13 +381,56 @@ function App() {
                   {vocalNotes.length > 0 && (
                     <div className="piano-roll-panel">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <h3 style={{ margin: 0 }}>Estudo de Melodia (Vocais)</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <h3 style={{ margin: 0 }}>Estudo de Melodia (Vocais)</h3>
+                          <button 
+                            className={`btn ${isMicActive ? 'btn-danger' : 'btn-primary'}`} 
+                            style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', display: 'flex', gap: '8px', alignItems: 'center' }}
+                            onClick={isMicActive ? stopMic : startMic}
+                          >
+                            {isMicActive ? (
+                              <>
+                                <span style={{ width: '8px', height: '8px', background: 'red', borderRadius: '50%', display: 'inline-block', animation: 'pulse 1.5s infinite' }}></span>
+                                Desligar Microfone
+                              </>
+                            ) : (
+                              '🎤 Ligar Microfone (Karaokê)'
+                            )}
+                          </button>
+                        </div>
                         <div className="current-note-display">
                            {(() => {
                               const currentNote = vocalNotes.find(n => currentTime >= n.start && currentTime <= n.end);
+                              
+                              let accuracyText = null;
+                              let accuracyColor = 'transparent';
+                              
+                              if (currentNote && isMicActive && userPitch) {
+                                const diff = Math.abs(currentNote.pitch - userPitch);
+                                if (diff === 0) {
+                                  accuracyText = "PERFEITO!";
+                                  accuracyColor = "#00E5FF";
+                                } else if (diff <= 1) {
+                                  accuracyText = "QUASE LÁ!";
+                                  accuracyColor = "#FFD700";
+                                } else {
+                                  accuracyText = "FORA DO TOM";
+                                  accuracyColor = "#FF4444";
+                                }
+                              }
+
                               if (currentNote) {
                                 const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-                                return <span>Nota atual: <strong>{noteNames[currentNote.pitch % 12] + Math.floor(currentNote.pitch / 12 - 1)}</strong></span>
+                                return (
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    {accuracyText && (
+                                      <span style={{ color: accuracyColor, fontWeight: 'bold', fontSize: '0.8rem', textShadow: `0 0 10px ${accuracyColor}` }}>
+                                        {accuracyText}
+                                      </span>
+                                    )}
+                                    <span>Nota atual: <strong>{noteNames[currentNote.pitch % 12] + Math.floor(currentNote.pitch / 12 - 1)}</strong></span>
+                                  </span>
+                                );
                               }
                               return <span style={{opacity: 0.5}}>Aguardando voz...</span>
                            })()}
@@ -425,7 +474,7 @@ function App() {
                             const maxP = 84;
                             const pRange = maxP - minP;
                             
-                            return visibleNotes.map((note, i) => {
+                            const renderedNotes = visibleNotes.map((note, i) => {
                               const left = ((note.start - currentTime + playheadOffset) / windowSize) * 100;
                               const width = ((note.end - note.start) / windowSize) * 100;
                               
@@ -452,6 +501,46 @@ function App() {
                                 </div>
                               );
                             });
+                            
+                            // User pitch dot
+                            let userPitchDot = null;
+                            if (isMicActive && userPitch !== null) {
+                              const clampedUserPitch = Math.max(minP, Math.min(maxP, userPitch));
+                              const top = (1 - (clampedUserPitch - minP) / pRange) * 100;
+                              
+                              const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                              const userNoteName = noteNames[userPitch % 12] + Math.floor(userPitch / 12 - 1);
+                              
+                              userPitchDot = (
+                                <div 
+                                  className="user-pitch-dot"
+                                  style={{
+                                    position: 'absolute',
+                                    left: '20%', // At playhead
+                                    top: `calc(${top}% - 8px)`,
+                                    width: '16px',
+                                    height: '16px',
+                                    background: '#FF4444',
+                                    borderRadius: '50%',
+                                    boxShadow: '0 0 15px #FF4444, 0 0 5px #fff',
+                                    zIndex: 50,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transform: 'translateX(-50%)'
+                                  }}
+                                >
+                                  <span style={{ fontSize: '7px', fontWeight: 'bold', color: '#fff', textShadow: 'none' }}>{userNoteName}</span>
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <>
+                                {renderedNotes}
+                                {userPitchDot}
+                              </>
+                            );
                           })()}
                         </div>
                       </div>
