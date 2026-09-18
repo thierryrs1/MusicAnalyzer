@@ -405,20 +405,48 @@ body, html {
   padding: 1rem;
 }
 
-.lyric-line {
-  display: block;
-  margin: 0.8rem 0;
-  color: var(--moises-text-muted);
-  transition: all 0.2s ease-out;
+.lyrics-wrapper.line-level {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
 }
 
-.lyric-line.active,
-.lyrics-line.active {
+.lyrics-wrapper.word-level {
+  display: block;
+  text-align: center;
+  line-height: 2.2;
+}
+
+.lyric-line {
+  color: var(--moises-text-muted);
+  font-size: 1.5rem;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.lyrics-wrapper.line-level .lyric-line {
+  display: block;
+}
+
+.lyrics-wrapper.word-level .lyric-line {
+  display: inline;
+  margin-right: 0.4rem;
+}
+
+.lyric-line.active {
   color: var(--moises-accent);
-  font-size: 1.4rem;
-  font-weight: 700;
+  font-size: 1.8rem;
+  font-weight: 600;
   text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
-  transform: scale(1.1);
+  transform: scale(1.05);
+}
+
+.lyrics-wrapper.word-level .lyric-line.active {
+  font-size: 1.5rem; /* Don't scale up too much inline to prevent reflows */
+  background: rgba(0, 229, 255, 0.1);
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
 .piano-roll-panel {

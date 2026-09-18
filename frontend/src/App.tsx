@@ -552,25 +552,26 @@ function App() {
                         Extraia as letras para acompanhar a música palavra por palavra.
                       </div>
                     ) : (
-                      lyrics.map((lyric, i) => {
-                        const isActive = currentTime >= lyric.start && currentTime < lyric.end;
-                        return (
-                          <div 
-                            key={i} 
-                            ref={isActive ? activeLyricRef : null}
-                            className={`lyric-line ${isActive ? 'active' : ''}`}
-                            onClick={() => {
-                              // Optional click-to-seek
-                              const audioElement = stemRefs.current["vocals"] || Object.values(stemRefs.current)[0];
-                              if (audioElement) {
-                                audioElement.currentTime = lyric.start;
-                              }
-                            }}
-                          >
-                            {lyric.word}
-                          </div>
-                        );
-                      })
+                      <div className={`lyrics-wrapper ${lyrics.length > 0 && lyrics.filter(l => !l.word.trim().includes(' ')).length / lyrics.length > 0.8 ? 'word-level' : 'line-level'}`}>
+                        {lyrics.map((lyric, i) => {
+                          const isActive = currentTime >= lyric.start && currentTime < lyric.end;
+                          return (
+                            <span 
+                              key={i} 
+                              ref={isActive ? activeLyricRef : null}
+                              className={`lyric-line ${isActive ? 'active' : ''}`}
+                              onClick={() => {
+                                const audioElement = stemRefs.current["vocals"] || Object.values(stemRefs.current)[0];
+                                if (audioElement) {
+                                  audioElement.currentTime = lyric.start;
+                                }
+                              }}
+                            >
+                              {lyric.word}{' '}
+                            </span>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>

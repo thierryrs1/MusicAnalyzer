@@ -144,7 +144,6 @@ async def extract_lyrics(filename: str):
                         
             if lyrics:
                 # Filtrar linhas de metadados no início (chines/inglês) que geralmente caem no 00:00.00
-                import re
                 first_true_lyric_idx = 0
                 for idx, l in enumerate(lyrics):
                     text_lower = l["word"].lower()
