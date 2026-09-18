@@ -143,25 +143,53 @@ async def extract_lyrics(filename: str):
                         })
                         
             if lyrics:
-                # Dynamic Sync Offset calculation using the vocals file
+                # Filtrar linhas de metadados no início (chines/inglês) que geralmente caem no 00:00.00
+                import re
+                first_true_lyric_idx = 0
+                for idx, l in enumerate(lyrics):
+                    text_lower = l["word"].lower()
+                    if ":" in text_lower and ("作" in text_lower or "编" in text_lower or "lyric" in text_lower or "writer" in text_lower):
+                        continue
+                    if l["original_start"] < 0.1 and ":" in text_lower:
+                        continue
+                    first_true_lyric_idx = idx
+                    break
+                
+                # Dynamic Sync Offset calculation usando pitch real (mesmo do Piano Roll)
                 sync_offset = 0.0
                 vocals_path = os.path.join(SEPARATED_DIR, "htdemucs_6s", safe_filename, "vocals.wav")
                 if os.path.exists(vocals_path):
                     try:
-                        from scipy.io import wavfile
+                        import librosa
                         import numpy as np
-                        sr, data = wavfile.read(vocals_path)
-                        if len(data.shape) > 1:
-                            data = data.mean(axis=1)
-                        threshold = 0.05 * np.max(np.abs(data))
-                        non_silent = np.where(np.abs(data) > threshold)[0]
+                        import scipy.signal
+                        
+                        y, sr = librosa.load(vocals_path, sr=22050)
+                        f0 = librosa.yin(y, fmin=65.4, fmax=1046.5, sr=sr, frame_length=2048)
+                        rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
+                        if np.max(rms) > 0:
+                            rms = rms / np.max(rms)
+                        
+                        f0 = np.where(f0 > 0, f0, 1.0)
+                        midi_pitches = librosa.hz_to_midi(f0)
+                        midi_pitches = np.round(midi_pitches).astype(int)
+                        
+                        min_len = min(len(midi_pitches), len(rms))
+                        midi_pitches = midi_pitches[:min_len]
+                        rms = rms[:min_len]
+                        
+                        midi_pitches[rms < 0.05] = 0
+                        midi_pitches = scipy.signal.medfilt(midi_pitches, kernel_size=5)
+                        
+                        # Find first non-zero pitch (primeira nota real cantada)
+                        non_silent = np.where(midi_pitches > 0)[0]
                         if len(non_silent) > 0:
-                            actual_start = non_silent[0] / sr
-                            lrc_start = lyrics[0]["original_start"]
+                            actual_start = librosa.frames_to_time(non_silent[0], sr=sr, hop_length=512)
+                            lrc_start = lyrics[first_true_lyric_idx]["original_start"]
                             sync_offset = lrc_start - actual_start
-                            print(f"DEBUG: Sync offset calculated: {sync_offset}s")
+                            print(f"DEBUG: LRC Start={lrc_start}, Actual Start={actual_start}, Sync offset calculated: {sync_offset}s")
                     except Exception as e:
-                        print(f"Erro no cálculo de offset: {e}")
+                        print(f"Erro no cálculo de offset com YIN: {e}")
                 
                 # Apply offset
                 for i in range(len(lyrics)):
