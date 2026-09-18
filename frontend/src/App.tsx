@@ -85,7 +85,7 @@ function App() {
       const data = await res.json();
       
       const fullStems: Record<string, string> = {};
-      const initialStates: Record<string, any> = {};
+      const initialStates: Record<string, { volume: number; muted: boolean; solo: boolean }> = {};
       for (const [key, path] of Object.entries(data.stems as Record<string, string>)) {
           fullStems[key] = `http://localhost:8000${path}`;
           initialStates[key] = { volume: 1, muted: false, solo: false };
@@ -94,7 +94,7 @@ function App() {
       setTrackStates(initialStates);
       setIsPlaying(false);
       setCurrentTime(0);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
       alert("Erro ao separar stems. Pode levar alguns minutos caso o modelo esteja baixando.");
     } finally {
@@ -107,7 +107,7 @@ function App() {
     setSpeed(newSpeed);
     if (audioRef.current) {
       audioRef.current.playbackRate = newSpeed;
-      (audioRef.current as any).preservesPitch = true;
+      (audioRef.current as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
     }
   };
 
@@ -187,7 +187,7 @@ function App() {
     }
     
     if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioCtxRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     }
 
     const checkBeats = () => {
