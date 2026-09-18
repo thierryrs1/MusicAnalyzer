@@ -483,3 +483,54 @@ body, html {
   transform: scaleY(1.5);
   z-index: 20;
 }
+
+.melodic-cipher-panel {
+  background: var(--moises-panel);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.melodic-cipher-panel h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.cipher-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 10px;
+  font-family: monospace;
+}
+
+.cipher-phrase {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: rgba(255,255,255,0.03);
+  padding: 10px;
+  border-radius: 6px;
+  line-height: 1.8;
+}
+
+.cipher-note {
+  font-size: 0.95rem;
+  color: #ccc;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.cipher-note.active {
+  background: var(--moises-accent);
+  color: #000;
+  font-weight: bold;
+  transform: scale(1.2);
+  box-shadow: 0 0 8px var(--moises-accent);
+}
