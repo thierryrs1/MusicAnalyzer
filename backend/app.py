@@ -135,7 +135,7 @@ async def extract_lyrics(filename: str):
                     seconds = float(match.group(2))
                     text = match.group(3).strip()
                     if text:
-                        start_time = minutes * 60 + seconds
+                        start_time = max(0, (minutes * 60 + seconds) - 1.2)
                         lyrics.append({
                             "word": text,
                             "start": start_time,

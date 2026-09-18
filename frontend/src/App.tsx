@@ -101,6 +101,7 @@ function App() {
           fullStems[key] = `http://localhost:8000${path}`;
           initialStates[key] = { volume: 1, muted: false, solo: false };
       }
+      initialStates["metronome"] = { volume: 1, muted: false, solo: false };
       
       // Pause the original audio
       if (audioRef.current) audioRef.current.pause();
@@ -220,25 +221,36 @@ function App() {
     osc.frequency.value = isFirstBeat ? 1500 : 1000;
     osc.type = 'sine';
     
-    gain.gain.setValueAtTime(0.5, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+    const metronomeVol = trackStates["metronome"]?.volume ?? 1;
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime((isFirstBeat ? 0.8 : 0.5) * metronomeVol, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
     
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.05);
   };
 
   useEffect(() => {
-    if (!isMetronomeEnabled || beats.length === 0) {
-        lastBeatIndexRef.current = -1;
-        return;
+    const metronomeState = trackStates["metronome"];
+    const anySolo = Object.values(trackStates).some(t => t.solo);
+    let isActive = false;
+
+    if (stems && metronomeState) {
+      isActive = !metronomeState.muted && (!anySolo || metronomeState.solo);
+    } else {
+      isActive = isMetronomeEnabled;
     }
-    
+
+    if (!isPlaying || !isActive || beats.length === 0) {
+      lastBeatIndexRef.current = -1;
+      return;
+    }
+
     if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      audioCtxRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     }
 
     const checkBeats = () => {
-      // Find current time depending on stems vs original
       let currentAudioTime = 0;
       let isPaused = true;
       if (stems && stemRefs.current[Object.keys(stems)[0]]) {
@@ -262,7 +274,8 @@ function App() {
 
     rafRef.current = requestAnimationFrame(checkBeats);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [isMetronomeEnabled, beats, stems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMetronomeEnabled, beats, stems, isPlaying, trackStates]);
 
   return (
     <div className="dashboard">
@@ -370,27 +383,51 @@ function App() {
                           min="0" max="1" step="0.01" 
                           value={trackStates[name]?.volume ?? 1} 
                           onChange={(e) => updateTrack(name, { volume: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                      
-                      <div className="track-visual">
-                        <div className="track-progress-bg">
-                          <div 
-                            className={`track-progress-fill color-${name}`} 
-                            style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                          />
-                        </div>
                       </div>
                       
                       <div className="track-waveform-container">
                         <div 
-                          className="track-waveform-fill" 
+                          className={`track-waveform-fill color-${name}`} 
                           style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
                         ></div>
                       </div>
                     </div>
                   );
                 })}
+                
+                {/* Faixa Artificial do Metrônomo */}
+                <div className="track-row" key="metronome">
+                  <div className="track-controls">
+                    <div className="track-header">
+                      <span className="track-name">METRONOME</span>
+                    </div>
+                    <div className="track-buttons">
+                      <button 
+                        className={`mute-btn ${trackStates["metronome"]?.muted ? 'active' : ''}`}
+                        onClick={() => updateTrack("metronome", { muted: !trackStates["metronome"]?.muted })}
+                      >M</button>
+                      <button 
+                        className={`solo-btn ${trackStates["metronome"]?.solo ? 'active' : ''}`}
+                        onClick={() => updateTrack("metronome", { solo: !trackStates["metronome"]?.solo })}
+                      >S</button>
+                    </div>
+                    <div className="volume-slider">
+                      <input 
+                        type="range" 
+                        min="0" max="1" step="0.01" 
+                        value={trackStates["metronome"]?.volume ?? 1} 
+                        onChange={(e) => updateTrack("metronome", { volume: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="track-waveform-container">
+                    <div 
+                      className="track-waveform-fill" 
+                      style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%', borderRightColor: '#ffffff' }}
+                    ></div>
+                  </div>
+                </div>
                   </div>
                 </div>
 
@@ -475,13 +512,16 @@ function App() {
                   disabled={isAnalyzing || isSeparating}
                 />
               </div>
-              <button 
-                className={`metronome-btn ${isMetronomeEnabled ? 'active' : ''}`}
-                onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
-                disabled={beats.length === 0}
-              >
-                {isMetronomeEnabled ? '🔊 Metrônomo' : '🔈 Metrônomo'}
-              </button>
+              
+              {!stems && (
+                <button 
+                  className={`metronome-btn ${isMetronomeEnabled ? 'active' : ''}`}
+                  onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
+                  disabled={beats.length === 0}
+                >
+                  {isMetronomeEnabled ? '🔊 Metrônomo' : '🔈 Metrônomo'}
+                </button>
+              )}
             </div>
           </div>
 
