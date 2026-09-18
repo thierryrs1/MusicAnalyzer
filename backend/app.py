@@ -3,6 +3,7 @@ import shutil
 import librosa
 import numpy as np
 import subprocess
+import sys
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -57,17 +58,19 @@ class SeparateResponse(BaseModel):
     stems: dict[str, str]
 
 @app.post("/separate/{filename}", response_model=SeparateResponse)
-async def separate_audio(filename: str):
+def separate_audio(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(file_path):
         return {"message": "File not found", "stems": {}}
         
-    # Run Demucs via subprocess
-    cmd = ["python", "-m", "demucs.separate", "-n", "htdemucs", "-o", SEPARATED_DIR, file_path]
-    subprocess.run(cmd, check=True)
-    
     track_name = os.path.splitext(filename)[0]
     stems_dir = f"htdemucs/{track_name}"
+    absolute_stems_dir = os.path.join(SEPARATED_DIR, stems_dir)
+    
+    if not os.path.exists(absolute_stems_dir):
+        # Run Demucs via subprocess using sys.executable to ensure the correct venv
+        cmd = [sys.executable, "-m", "demucs.separate", "-n", "htdemucs", "-o", SEPARATED_DIR, file_path]
+        subprocess.run(cmd, check=True)
     
     stems_urls = {
         "vocals": f"/stems/{stems_dir}/vocals.wav",
