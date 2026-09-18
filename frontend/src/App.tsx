@@ -33,6 +33,7 @@ function App() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [midiProcessing, setMidiProcessing] = useState<string | null>(null);
+  const [vocalNotes, setVocalNotes] = useState<any[]>([]);
   const stemRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -144,17 +145,8 @@ function App() {
         method: 'POST'
       });
       const data = await response.json();
-      if (data.midi_url) {
-        const midiRes = await fetch(`http://localhost:8000${data.midi_url}`);
-        const blob = await midiRes.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${stem}.mid`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+      if (data.notes) {
+        setVocalNotes(data.notes);
       }
     } catch (err) {
       console.error(err);
@@ -476,8 +468,45 @@ function App() {
                     ></div>
                   </div>
                 </div>
-                  </div>
                 </div>
+                
+                {/* PIANO ROLL (Modo Estudo) */}
+                {vocalNotes.length > 0 && (
+                  <div className="piano-roll-panel">
+                    <h3>Visualizador de Notas (Vocais)</h3>
+                    <div className="piano-roll-container">
+                      <div className="piano-playhead" style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}></div>
+                      {vocalNotes.map((note, i) => {
+                        const minPitch = Math.min(...vocalNotes.map(n => n.pitch)) - 2;
+                        const maxPitch = Math.max(...vocalNotes.map(n => n.pitch)) + 2;
+                        const pitchRange = maxPitch - minPitch;
+                        const left = (note.start / duration) * 100;
+                        const width = ((note.end - note.start) / duration) * 100;
+                        const top = (1 - (note.pitch - minPitch) / pitchRange) * 100;
+                        
+                        const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                        const noteName = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
+
+                        return (
+                          <div 
+                            key={i} 
+                            className="midi-note" 
+                            title={`Nota: ${noteName}`}
+                            style={{ 
+                              left: `${left}%`, 
+                              width: `${Math.max(0.1, width)}%`, 
+                              top: `${top}%`,
+                              height: `${100 / pitchRange}%`
+                            }}
+                          >
+                            <span>{noteName}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
 
                 <div className="lyrics-panel">
                   <div className="lyrics-header">
