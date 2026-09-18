@@ -355,7 +355,7 @@ function App() {
                     <div key={name} className="track-row">
                       <audio 
                         src={url} 
-                        ref={el => stemRefs.current[name] = el}
+                        ref={el => { stemRefs.current[name] = el; }}
                         onTimeUpdate={isFirst ? handleTimeUpdate : undefined}
                         onLoadedMetadata={isFirst ? handleTimeUpdate : undefined}
                         onEnded={isFirst ? () => setIsPlaying(false) : undefined}
