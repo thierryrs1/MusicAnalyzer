@@ -64,18 +64,20 @@ def separate_audio(filename: str):
         return {"message": "File not found", "stems": {}}
         
     track_name = os.path.splitext(filename)[0]
-    stems_dir = f"htdemucs/{track_name}"
+    stems_dir = f"htdemucs_6s/{track_name}"
     absolute_stems_dir = os.path.join(SEPARATED_DIR, stems_dir)
     
     if not os.path.exists(absolute_stems_dir):
         # Run Demucs via subprocess using sys.executable to ensure the correct venv
-        cmd = [sys.executable, "-m", "demucs.separate", "-n", "htdemucs", "-o", SEPARATED_DIR, file_path]
+        cmd = [sys.executable, "-m", "demucs.separate", "-n", "htdemucs_6s", "-o", SEPARATED_DIR, file_path]
         subprocess.run(cmd, check=True)
     
     stems_urls = {
         "vocals": f"/stems/{stems_dir}/vocals.wav",
         "drums": f"/stems/{stems_dir}/drums.wav",
         "bass": f"/stems/{stems_dir}/bass.wav",
+        "guitar": f"/stems/{stems_dir}/guitar.wav",
+        "piano": f"/stems/{stems_dir}/piano.wav",
         "other": f"/stems/{stems_dir}/other.wav"
     }
     

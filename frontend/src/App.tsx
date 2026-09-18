@@ -1,5 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -11,10 +17,18 @@ function App() {
   const [filename, setFilename] = useState<string | null>(null);
   const [stems, setStems] = useState<Record<string, string> | null>(null);
   const [isSeparating, setIsSeparating] = useState(false);
-  
+
+  // Mixer States
+  const [trackStates, setTrackStates] = useState<Record<string, { volume: number, muted: boolean, solo: boolean }>>({});
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const stemRefs = useRef<Record<string, HTMLAudioElement | null>>({});
+
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -71,10 +85,15 @@ function App() {
       const data = await res.json();
       
       const fullStems: Record<string, string> = {};
+      const initialStates: Record<string, any> = {};
       for (const [key, path] of Object.entries(data.stems as Record<string, string>)) {
           fullStems[key] = `http://localhost:8000${path}`;
+          initialStates[key] = { volume: 1, muted: false, solo: false };
       }
       setStems(fullStems);
+      setTrackStates(initialStates);
+      setIsPlaying(false);
+      setCurrentTime(0);
     } catch (err) {
       console.error(err);
       alert("Erro ao separar stems. Pode levar alguns minutos caso o modelo esteja baixando.");
@@ -90,6 +109,50 @@ function App() {
       audioRef.current.playbackRate = newSpeed;
       (audioRef.current as any).preservesPitch = true;
     }
+  };
+
+  const togglePlay = () => {
+    const newIsPlaying = !isPlaying;
+    setIsPlaying(newIsPlaying);
+    Object.values(stemRefs.current).forEach(audio => {
+      if (audio) {
+        if (newIsPlaying) audio.play();
+        else audio.pause();
+      }
+    });
+  };
+
+  const handleTimeUpdate = () => {
+    const firstTrack = Object.values(stemRefs.current)[0];
+    if (firstTrack) {
+      setCurrentTime(firstTrack.currentTime);
+      if (!duration && firstTrack.duration) setDuration(firstTrack.duration);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    Object.values(stemRefs.current).forEach(audio => {
+      if (audio) audio.currentTime = time;
+    });
+  };
+
+  const updateTrack = (name: string, updates: Partial<{ volume: number, muted: boolean, solo: boolean }>) => {
+    setTrackStates(prev => {
+      const next = { ...prev, [name]: { ...prev[name], ...updates } };
+      const anySolo = Object.values(next).some(t => t.solo);
+      
+      Object.keys(next).forEach(key => {
+        const audio = stemRefs.current[key];
+        if (audio) {
+          const state = next[key];
+          audio.volume = state.volume;
+          audio.muted = state.muted || (anySolo && !state.solo);
+        }
+      });
+      return next;
+    });
   };
 
   const lastBeatIndexRef = useRef(-1);
@@ -171,8 +234,8 @@ function App() {
         <div className="fiori-card">
           <h2>2. Resultados da Análise</h2>
           <div className="control-row">
-            <div className="stat-box">BPM: {bpm}</div>
-            <div className="stat-box">Beats Detectados: {beats.length}</div>
+            <div className="stat-box"><span>BPM</span> {bpm}</div>
+            <div className="stat-box"><span>Beats</span> {beats.length}</div>
           </div>
         </div>
       )}
@@ -223,32 +286,82 @@ function App() {
             onClick={handleSeparate} 
             disabled={isSeparating}
           >
-            {isSeparating ? "Separando (Isso pode levar alguns minutos)..." : "Extrair Vocais, Bateria, Baixo e Outros"}
+            {isSeparating ? "Separando (Isso pode levar alguns minutos)..." : "Extrair Vocais, Bateria, Baixo, Guitarra, Piano e Outros"}
           </button>
         </div>
       )}
 
       {stems && (
         <div className="fiori-card">
-          <h2>4. Stem Mixer</h2>
-          <div className="stem-mixer">
-            {Object.entries(stems).map(([name, url]) => (
-              <div key={name} className="stem-track">
-                <span className="stem-label">{name.toUpperCase()}</span>
-                <audio 
-                  src={url} 
-                  controls 
-                  className="stem-audio" 
-                  ref={el => stemRefs.current[name] = el}
-                />
-                <a href={url} download={`${name}.wav`} className="btn stem-download-btn">Baixar</a>
-              </div>
-            ))}
-          </div>
-          <div className="control-row" style={{marginTop: '1rem'}}>
-            <button className="btn" onClick={() => Object.values(stemRefs.current).forEach(a => a?.play())}>▶ Play Todos</button>
-            <button className="btn" onClick={() => Object.values(stemRefs.current).forEach(a => a?.pause())}>⏸ Pause Todos</button>
-            <button className="btn" onClick={() => Object.values(stemRefs.current).forEach(a => { if(a) a.currentTime = 0; })}>⏮ Reset</button>
+          <h2>4. Studio Mixer</h2>
+          <div className="mixer-container">
+            <div className="master-controls">
+              <button className="btn" onClick={togglePlay}>
+                {isPlaying ? "⏸ Pause" : "▶ Play"}
+              </button>
+              <input 
+                type="range" 
+                className="master-seek" 
+                min="0" 
+                max={duration || 100} 
+                step="0.1" 
+                value={currentTime} 
+                onChange={handleSeek} 
+              />
+              <span className="time-display">{formatTime(currentTime)} / {formatTime(duration)}</span>
+            </div>
+
+            <div className="tracks-container">
+              {Object.entries(stems).map(([name, url], index) => {
+                const isFirst = index === 0;
+                return (
+                  <div key={name} className="track-row">
+                    <audio 
+                      src={url} 
+                      ref={el => stemRefs.current[name] = el}
+                      onTimeUpdate={isFirst ? handleTimeUpdate : undefined}
+                      onLoadedMetadata={isFirst ? handleTimeUpdate : undefined}
+                      onEnded={isFirst ? () => setIsPlaying(false) : undefined}
+                    />
+                    
+                    <div className="track-controls">
+                      <div className="track-header">
+                        <span className="track-name">{name.toUpperCase()}</span>
+                        <a href={url} download={`${name}.wav`} className="stem-download-btn" title="Baixar">↓</a>
+                      </div>
+                      <div className="track-buttons">
+                        <button 
+                          className={`mute-btn ${trackStates[name]?.muted ? 'active' : ''}`}
+                          onClick={() => updateTrack(name, { muted: !trackStates[name].muted })}
+                          title="Mute"
+                        >M</button>
+                        <button 
+                          className={`solo-btn ${trackStates[name]?.solo ? 'active' : ''}`}
+                          onClick={() => updateTrack(name, { solo: !trackStates[name].solo })}
+                          title="Solo"
+                        >S</button>
+                      </div>
+                      <input 
+                        type="range" 
+                        className="volume-slider" 
+                        min="0" max="1" step="0.01" 
+                        value={trackStates[name]?.volume ?? 1} 
+                        onChange={(e) => updateTrack(name, { volume: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                    
+                    <div className="track-visual">
+                      <div className="track-progress-bg">
+                        <div 
+                          className={`track-progress-fill color-${name}`} 
+                          style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
