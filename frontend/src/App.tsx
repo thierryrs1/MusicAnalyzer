@@ -29,6 +29,10 @@ function App() {
 
   // Karaoke hook
   const { pitch: userPitch, isRecording: isMicActive, startRecording: startMic, stopRecording: stopMic } = usePitchDetection();
+  
+  // User Performance History
+  const userPerformanceRef = useRef<{time: number, pitch: number}[]>([]);
+  const lastRecordedTimeRef = useRef(0);
 
   // View Mode
   const [viewMode, setViewMode] = useState<'mixer' | 'karaoke'>('mixer');
@@ -48,6 +52,7 @@ function App() {
 
   const runAnalysis = async (fileToAnalyze: File) => {
     setIsAnalyzing(true);
+    userPerformanceRef.current = []; // Limpa o histórico de voz
     
     const formData = new FormData();
     formData.append("file", fileToAnalyze);
@@ -94,6 +99,7 @@ function App() {
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
+      userPerformanceRef.current = [];
       
       runAnalysis(newFile);
     }
@@ -234,6 +240,16 @@ function App() {
       return next;
     });
   };
+
+  // Record User Voice Trail
+  useEffect(() => {
+    if (isPlaying && isMicActive && userPitch !== null) {
+      if (Math.abs(currentTime - lastRecordedTimeRef.current) > 0.05) {
+        userPerformanceRef.current.push({ time: currentTime, pitch: userPitch });
+        lastRecordedTimeRef.current = currentTime;
+      }
+    }
+  }, [userPitch, currentTime, isPlaying, isMicActive]);
 
   // Metronome Logic
   const lastBeatIndexRef = useRef(-1);
@@ -378,12 +394,11 @@ function App() {
               </div>
             ) : (
               <>
-                <div className="view-tabs">
-                  <button className={`tab-btn ${viewMode === 'mixer' ? 'active' : ''}`} onClick={() => setViewMode('mixer')}>Mixer Multi-faixa</button>
-                  <button className={`tab-btn ${viewMode === 'karaoke' ? 'active' : ''}`} onClick={() => setViewMode('karaoke')}>Modo Karaokê (Estudo de Vocais)</button>
-                </div>
-                
                 <div className="tracks-wrapper">
+                  <div className="view-tabs">
+                    <button className={`tab-btn ${viewMode === 'mixer' ? 'active' : ''}`} onClick={() => setViewMode('mixer')}>Mixer Multi-faixa</button>
+                    <button className={`tab-btn ${viewMode === 'karaoke' ? 'active' : ''}`} onClick={() => setViewMode('karaoke')}>Modo Karaokê (Estudo de Vocais)</button>
+                  </div>
                   
                   {/* PIANO ROLL (Modo Estudo) */}
                   {vocalNotes.length > 0 && viewMode === 'karaoke' && (
@@ -510,7 +525,35 @@ function App() {
                               );
                             });
                             
-                            // User pitch dot
+                            // User performance trail (red dots)
+                            const visibleUserDots = userPerformanceRef.current.filter(dot => 
+                              dot.time >= currentTime - playheadOffset && dot.time <= currentTime + windowSize - playheadOffset
+                            );
+                            
+                            const renderedUserDots = visibleUserDots.map((dot, i) => {
+                              const left = ((dot.time - currentTime + playheadOffset) / windowSize) * 100;
+                              const clampedPitch = Math.max(minP, Math.min(maxP, dot.pitch));
+                              const top = (1 - (clampedPitch - minP) / pRange) * 100;
+                              return (
+                                <div 
+                                  key={`trail-${i}`}
+                                  style={{
+                                    position: 'absolute',
+                                    left: `${left}%`,
+                                    top: `calc(${top}% - 4px)`,
+                                    width: '8px',
+                                    height: '8px',
+                                    background: '#FF4444',
+                                    borderRadius: '50%',
+                                    opacity: 0.6,
+                                    zIndex: 25,
+                                    boxShadow: '0 0 5px #FF4444'
+                                  }}
+                                />
+                              );
+                            });
+                            
+                            // User pitch dot (Current real-time)
                             let userPitchDot = null;
                             if (isMicActive && userPitch !== null) {
                               const clampedUserPitch = Math.max(minP, Math.min(maxP, userPitch));
@@ -546,6 +589,7 @@ function App() {
                             return (
                               <>
                                 {renderedNotes}
+                                {renderedUserDots}
                                 {userPitchDot}
                               </>
                             );
