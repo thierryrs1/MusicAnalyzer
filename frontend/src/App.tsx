@@ -376,36 +376,53 @@ function App() {
                     <div className="piano-roll-panel">
                       <h3>Estudo de Melodia (Vocais)</h3>
                       <div className="piano-roll-container">
-                        <div className="piano-playhead" style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}></div>
+                        
+                        {/* Grid background */}
+                        <div className="piano-grid">
+                          {[...Array(48)].map((_, i) => (
+                            <div key={i} className="piano-grid-line" style={{ top: `${(i / 48) * 100}%` }}></div>
+                          ))}
+                        </div>
+                        
+                        <div className="piano-playhead" style={{ left: '20%' }}></div>
+                        
                         {(() => {
-                          const minPitch = Math.min(...vocalNotes.map(n => n.pitch)) - 2;
-                          const maxPitch = Math.max(...vocalNotes.map(n => n.pitch)) + 2;
-                          const pitchRange = Math.max(1, maxPitch - minPitch);
+                          const windowSize = 10;
+                          const playheadOffset = 2;
                           
-                          return vocalNotes.map((note, i) => {
-                            const left = duration > 0 ? (note.start / duration) * 100 : 0;
-                            const width = duration > 0 ? ((note.end - note.start) / duration) * 100 : 0;
-                            const top = (1 - (note.pitch - minPitch) / pitchRange) * 100;
-                          
-                          const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-                          const noteName = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
-
-                          return (
-                            <div 
-                              key={i} 
-                              className="midi-note" 
-                              title={`Nota: ${noteName}`}
-                              style={{ 
-                                left: `${left}%`, 
-                                width: `${Math.max(0.1, width)}%`, 
-                                top: `${top}%`,
-                                height: `${100 / pitchRange}%`
-                              }}
-                            >
-                              <span>{noteName}</span>
-                            </div>
+                          const visibleNotes = vocalNotes.filter(n => 
+                            (n.start - currentTime + playheadOffset) < windowSize &&
+                            (n.end - currentTime + playheadOffset) > 0
                           );
-                        });
+                          
+                          const minP = 36;
+                          const maxP = 84;
+                          const pRange = maxP - minP;
+                          
+                          return visibleNotes.map((note, i) => {
+                            const left = ((note.start - currentTime + playheadOffset) / windowSize) * 100;
+                            const width = ((note.end - note.start) / windowSize) * 100;
+                            
+                            const clampedPitch = Math.max(minP, Math.min(maxP, note.pitch));
+                            const top = (1 - (clampedPitch - minP) / pRange) * 100;
+                            
+                            const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                            const noteName = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
+
+                            return (
+                              <div 
+                                key={i} 
+                                className="midi-note" 
+                                title={`Nota: ${noteName}`}
+                                style={{ 
+                                  left: `${left}%`, 
+                                  width: `${Math.max(0.5, width)}%`, 
+                                  top: `${top}%`,
+                                  height: `${100 / pRange}%`
+                                }}
+                              />
+                            );
+                          });
                         })()}
                       </div>
                     </div>
