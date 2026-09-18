@@ -507,6 +507,10 @@ function App() {
                               const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
                               const noteName = noteNames[note.pitch % 12] + Math.floor(note.pitch / 12 - 1);
                               const isCurrent = currentTime >= note.start && currentTime <= note.end;
+                              const isPast = currentTime > note.end;
+                              const fillPercentage = isCurrent 
+                                ? Math.max(0, Math.min(100, ((currentTime - note.start) / (note.end - note.start)) * 100))
+                                : (isPast ? 100 : 0);
 
                               return (
                                 <div 
@@ -516,11 +520,14 @@ function App() {
                                   style={{ 
                                     left: `${left}%`, 
                                     width: `${Math.max(0.5, width)}%`, 
-                                    top: `calc(${top}% - 10px)`,
-                                    height: `20px`
+                                    top: `calc(${top}% - 12px)`,
+                                    height: `24px`
                                   }}
                                 >
-                                  <span className="note-label">{noteName}</span>
+                                  <div className="midi-note-fill" style={{ width: `${fillPercentage}%` }}></div>
+                                  {isCurrent && fillPercentage > 0 && fillPercentage < 100 && (
+                                    <div className="midi-note-glow" style={{ left: `${fillPercentage}%` }}></div>
+                                  )}
                                 </div>
                               );
                             });
@@ -534,20 +541,29 @@ function App() {
                               const left = ((dot.time - currentTime + playheadOffset) / windowSize) * 100;
                               const clampedPitch = Math.max(minP, Math.min(maxP, dot.pitch));
                               const top = (1 - (clampedPitch - minP) / pRange) * 100;
+                              // accuracy determines color of sparks
+                              let isAccurate = false;
+                              const currentNote = vocalNotes.find(n => dot.time >= n.start && dot.time <= n.end);
+                              if (currentNote) {
+                                isAccurate = Math.abs(currentNote.pitch - dot.pitch) <= 1;
+                              }
+                              
+                              const sparkColor = isAccurate ? '#FFD700' : '#FF4444'; // Yellow if accurate, red if missed
+                              
                               return (
                                 <div 
                                   key={`trail-${i}`}
                                   style={{
                                     position: 'absolute',
                                     left: `${left}%`,
-                                    top: `calc(${top}% - 4px)`,
-                                    width: '8px',
-                                    height: '8px',
-                                    background: '#FF4444',
+                                    top: `calc(${top}% - 2px)`,
+                                    width: '4px',
+                                    height: '4px',
+                                    background: sparkColor,
                                     borderRadius: '50%',
-                                    opacity: 0.6,
+                                    opacity: 0.8,
                                     zIndex: 25,
-                                    boxShadow: '0 0 5px #FF4444'
+                                    boxShadow: `0 0 8px ${sparkColor}, 0 0 4px #fff`
                                   }}
                                 />
                               );
@@ -568,21 +584,17 @@ function App() {
                                   style={{
                                     position: 'absolute',
                                     left: '20%', // At playhead
-                                    top: `calc(${top}% - 8px)`,
-                                    width: '16px',
-                                    height: '16px',
-                                    background: '#FF4444',
+                                    top: `calc(${top}% - 6px)`,
+                                    width: '12px',
+                                    height: '12px',
+                                    background: '#fff',
                                     borderRadius: '50%',
-                                    boxShadow: '0 0 15px #FF4444, 0 0 5px #fff',
+                                    boxShadow: '0 0 20px #FFD700, 0 0 10px #fff',
                                     zIndex: 50,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transform: 'translateX(-50%)'
+                                    transform: 'translateX(-50%)',
+                                    transition: 'top 0.05s linear'
                                   }}
-                                >
-                                  <span style={{ fontSize: '7px', fontWeight: 'bold', color: '#fff', textShadow: 'none' }}>{userNoteName}</span>
-                                </div>
+                                />
                               );
                             }
                             

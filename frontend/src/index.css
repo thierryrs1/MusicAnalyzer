@@ -578,30 +578,44 @@ body, html {
 
 .midi-note {
   position: absolute;
-  background: linear-gradient(90deg, #00E5FF, #32ADE6);
-  border-radius: 6px;
-  opacity: 0.8;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
   transition: opacity 0.2s, transform 0.1s;
   cursor: crosshair;
-  box-shadow: 0 2px 8px rgba(0, 229, 255, 0.4);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
-  justify-content: center;
   overflow: hidden;
   z-index: 20;
 }
-.midi-note.active-note {
-  opacity: 1;
-  background: linear-gradient(90deg, #fff, #00E5FF);
-  box-shadow: 0 0 15px #00E5FF, 0 0 5px #fff;
-  transform: scaleY(1.3);
-  z-index: 30;
+
+.midi-note-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #00B4DB, #0083B0);
+  border-radius: 20px;
+  transition: width 0.1s linear;
 }
-.midi-note .note-label {
-  font-size: 0.65rem;
-  font-weight: bold;
-  color: #000;
-  white-space: nowrap;
+
+.midi-note-glow {
+  position: absolute;
+  top: 0;
+  width: 20px;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 70%);
+  transform: translateX(-50%);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.8), 0 0 10px #FFD700;
+  pointer-events: none;
+}
+
+.midi-note.active-note {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 15px rgba(0, 180, 219, 0.5);
+  transform: scaleY(1.2);
+  z-index: 30;
 }
 
 .midi-note:hover {
