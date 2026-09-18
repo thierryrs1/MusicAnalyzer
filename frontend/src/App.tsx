@@ -145,10 +145,16 @@ function App() {
       });
       const data = await response.json();
       if (data.midi_url) {
+        const midiRes = await fetch(`http://localhost:8000${data.midi_url}`);
+        const blob = await midiRes.blob();
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = `http://localhost:8000${data.midi_url}`;
+        a.href = url;
         a.download = `${stem}.mid`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
       }
     } catch (err) {
       console.error(err);
