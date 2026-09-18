@@ -19,6 +19,11 @@ function App() {
   const [stems, setStems] = useState<Record<string, string> | null>(null);
   const [isSeparating, setIsSeparating] = useState(false);
 
+  const [lyrics, setLyrics] = useState<{word: string, start: number, end: number}[] | null>(null);
+  const [isExtractingLyrics, setIsExtractingLyrics] = useState(false);
+  const lyricsContainerRef = useRef<HTMLDivElement>(null);
+  const activeLyricRef = useRef<HTMLDivElement>(null);
+
   // Mixer States
   const [trackStates, setTrackStates] = useState<Record<string, { volume: number; muted: boolean; solo: boolean }>>({});
   const [isPlaying, setIsPlaying] = useState(false);
@@ -57,6 +62,12 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    if (activeLyricRef.current && lyricsContainerRef.current) {
+      activeLyricRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [currentTime]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFile = e.target.files[0];
@@ -67,6 +78,7 @@ function App() {
       setBeats([]);
       setFilename(null);
       setStems(null);
+      setLyrics(null);
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
@@ -102,6 +114,22 @@ function App() {
       alert("Erro ao separar stems.");
     } finally {
       setIsSeparating(false);
+    }
+  };
+
+  const handleExtractLyrics = async () => {
+    if (!filename) return;
+    setIsExtractingLyrics(true);
+    try {
+      const res = await fetch(`http://localhost:8000/lyrics/${filename}`, { method: "POST" });
+      if (!res.ok) throw new Error("Erro na extração de letras");
+      const data = await res.json();
+      setLyrics(data.lyrics);
+    } catch (err: unknown) {
+      console.error(err);
+      alert("Erro ao extrair letras.");
+    } finally {
+      setIsExtractingLyrics(false);
     }
   };
 
@@ -263,50 +291,6 @@ function App() {
         </div>
       ) : (
         <div className="workspace">
-          {/* Barra de Transporte Unificada */}
-          <div className="transport-bar">
-            <button className="play-btn" onClick={togglePlay} disabled={isAnalyzing || isSeparating}>
-              {isPlaying ? '⏸' : '▶'}
-            </button>
-            
-            <div className="seek-container">
-              <span className="time">{formatTime(currentTime)}</span>
-              <input 
-                type="range" 
-                className="master-seek" 
-                min="0" 
-                max={duration || 100} 
-                step="0.1" 
-                value={currentTime} 
-                onChange={handleSeek} 
-                disabled={isAnalyzing || isSeparating}
-              />
-              <span className="time">{formatTime(duration)}</span>
-            </div>
-            
-            <div className="extra-controls">
-              <div className="speed-control">
-                <span>{speed}x</span>
-                <input 
-                  type="range" 
-                  min="0.5" 
-                  max="1.5" 
-                  step="0.05" 
-                  value={speed} 
-                  onChange={handleSpeedChange} 
-                  disabled={isAnalyzing || isSeparating}
-                />
-              </div>
-              <button 
-                className={`metronome-btn ${isMetronomeEnabled ? 'active' : ''}`}
-                onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
-                disabled={beats.length === 0}
-              >
-                {isMetronomeEnabled ? '🔊 Metrônomo' : '🔈 Metrônomo'}
-              </button>
-            </div>
-          </div>
-
           {/* Área do Mixer Principal */}
           <div className="mixer-area">
             {!stems ? (
@@ -348,7 +332,9 @@ function App() {
                 </div>
               </div>
             ) : (
-              <div className="tracks-container">
+              <>
+                <div className="tracks-wrapper">
+                  <div className="tracks-container">
                 {Object.entries(stems).map(([name, url], index) => {
                   const isFirst = index === 0;
                   return (
@@ -392,15 +378,113 @@ function App() {
                           <div 
                             className={`track-progress-fill color-${name}`} 
                             style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                          ></div>
+                          />
                         </div>
+                      </div>
+                      
+                      <div className="track-waveform-container">
+                        <div 
+                          className="track-waveform-fill" 
+                          style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
+                        ></div>
                       </div>
                     </div>
                   );
                 })}
-              </div>
+                  </div>
+                </div>
+
+                <div className="lyrics-panel">
+                  <div className="lyrics-header">
+                    <h3>Letras & Karaokê</h3>
+                    {!lyrics && (
+                      <button 
+                        className="btn" 
+                        style={{padding: '0.4rem 0.8rem', fontSize: '0.8rem'}}
+                        onClick={handleExtractLyrics}
+                        disabled={isExtractingLyrics}
+                      >
+                        {isExtractingLyrics ? "Transcrevendo..." : "Extrair Letras (IA)"}
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="lyrics-content" ref={lyricsContainerRef}>
+                    {!lyrics ? (
+                      <div style={{color: 'var(--moises-text-muted)', fontSize: '1rem', marginTop: '2rem'}}>
+                        Extraia as letras para acompanhar a música palavra por palavra.
+                      </div>
+                    ) : (
+                      lyrics.map((lyric, i) => {
+                        const isActive = currentTime >= lyric.start && currentTime < lyric.end;
+                        return (
+                          <div 
+                            key={i} 
+                            ref={isActive ? activeLyricRef : null}
+                            className={`lyric-line ${isActive ? 'active' : ''}`}
+                            onClick={() => {
+                              // Optional click-to-seek
+                              const audioElement = stemRefs.current["vocals"] || Object.values(stemRefs.current)[0];
+                              if (audioElement) {
+                                audioElement.currentTime = lyric.start;
+                              }
+                            }}
+                          >
+                            {lyric.word}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </div>
+
+          {/* Barra de Transporte Unificada (Movida para baixo) */}
+          <div className="transport-bar">
+            <button className="play-btn" onClick={togglePlay} disabled={isAnalyzing || isSeparating}>
+              {isPlaying ? '⏸' : '▶'}
+            </button>
+            
+            <div className="seek-container">
+              <span className="time">{formatTime(currentTime)}</span>
+              <input 
+                type="range" 
+                className="master-seek" 
+                min="0" 
+                max={duration || 100} 
+                step="0.1" 
+                value={currentTime} 
+                onChange={handleSeek} 
+                disabled={isAnalyzing || isSeparating}
+              />
+              <span className="time">{formatTime(duration)}</span>
+            </div>
+            
+            <div className="extra-controls">
+              <div className="speed-control">
+                <span>{speed}x</span>
+                <input 
+                  type="range" 
+                  min="0.5" 
+                  max="1.5" 
+                  step="0.05" 
+                  value={speed} 
+                  onChange={handleSpeedChange} 
+                  disabled={isAnalyzing || isSeparating}
+                />
+              </div>
+              <button 
+                className={`metronome-btn ${isMetronomeEnabled ? 'active' : ''}`}
+                onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
+                disabled={beats.length === 0}
+              >
+                {isMetronomeEnabled ? '🔊 Metrônomo' : '🔈 Metrônomo'}
+              </button>
+            </div>
+          </div>
+
         </div>
       )}
     </div>

@@ -122,7 +122,7 @@ body, html {
   align-items: center;
   padding: 1rem 2rem;
   background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid var(--moises-card-border);
+  border-top: 1px solid var(--moises-card-border);
   gap: 2rem;
 }
 
@@ -211,8 +211,19 @@ body, html {
 
 .mixer-area {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  gap: 2rem;
   padding: 2rem;
+  overflow: hidden;
+}
+
+.tracks-wrapper {
+  flex: 2;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-right: 1rem;
 }
 
 .original-track-view {
@@ -244,7 +255,6 @@ body, html {
 
 .track-row {
   display: flex;
-  gap: 1.5rem;
   align-items: center;
   background: rgba(255,255,255,0.02);
   border-radius: 0.75rem;
@@ -265,6 +275,28 @@ body, html {
   padding-right: 1.5rem;
   border-right: 1px solid var(--moises-card-border);
 }
+
+.track-waveform-container {
+  flex: 1;
+  height: 40px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 0.5rem;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+  margin-left: 1.5rem;
+}
+
+.track-waveform-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-right: 2px solid var(--moises-accent);
+  transition: width 0.1s linear;
+}
+
 
 .track-header {
   display: flex;
@@ -359,3 +391,50 @@ body, html {
   font-size: 1.1rem;
 }
 .download-icon:hover { color: #fff; }
+
+.lyrics-panel {
+  flex: 1;
+  background: rgba(0,0,0,0.3);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--moises-card-border);
+  max-width: 400px;
+}
+
+.lyrics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.lyrics-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.lyrics-content {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 1.3rem;
+  line-height: 2;
+  text-align: center;
+  padding: 1rem;
+}
+
+.lyric-line {
+  display: block;
+  margin: 0.8rem 0;
+  color: var(--moises-text-muted);
+  transition: all 0.2s ease-out;
+}
+
+.lyric-line.active {
+  color: #fff;
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+  transform: scale(1.1);
+  font-weight: 600;
+}
